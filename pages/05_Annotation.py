@@ -4,8 +4,10 @@ import streamlit as st
 
 from analysis import annotation
 from ui import plots, state
+from ui.theme import apply_theme
 
 st.set_page_config(page_title="sc_tool — Annotation", layout="wide")
+apply_theme()
 
 st.title("Cell Type Annotation")
 

@@ -3,8 +3,10 @@ import streamlit as st
 
 from analysis import reduction
 from ui import plots, state
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — Reduction", layout="wide")
+apply_theme()
 
 st.title("Dimensionality Reduction")
 
@@ -164,3 +166,6 @@ else:
         color_by = None if color_by_choice == "(none)" else color_by_choice
 
         st.plotly_chart(plots.umap_scatter(adata, color_by=color_by), use_container_width=True)
+
+if state.umap_done():
+    next_page_button("Annotation", "pages/05_Annotation.py")

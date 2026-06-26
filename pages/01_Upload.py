@@ -2,8 +2,10 @@ import streamlit as st
 
 from analysis import io
 from ui import state
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — Upload", layout="wide")
+apply_theme()
 
 st.title("Upload Dataset")
 
@@ -59,3 +61,5 @@ if state.has_adata():
         with col_uns:
             if adata.uns:
                 st.write("**Unstructured metadata (uns):**", list(adata.uns.keys()))
+
+    next_page_button("QC", "pages/02_QC.py")

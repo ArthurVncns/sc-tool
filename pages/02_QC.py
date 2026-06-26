@@ -2,8 +2,10 @@ import streamlit as st
 
 from analysis import qc
 from ui import plots, state
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — QC", layout="wide")
+apply_theme()
 
 st.title("Quality Control")
 
@@ -198,3 +200,6 @@ if st.button("Apply Filters", type="primary", disabled=(n_passing == 0)):
         f"**{filtered.n_obs:,} cells** remaining."
     )
     st.rerun()
+
+if state.qc_is_computed():
+    next_page_button("Preprocessing", "pages/03_Preprocessing.py")

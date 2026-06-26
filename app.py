@@ -1,8 +1,10 @@
 import streamlit as st
 
 from ui import state
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool", layout="wide")
+apply_theme()
 
 st.title("sc_tool")
 st.caption("Interactive single-cell RNA-seq analysis")
@@ -30,7 +32,7 @@ if state.has_adata():
     col3.metric("QC computed", "Yes" if state.qc_is_computed() else "No")
     col3.metric("Preprocessed", "Yes" if state.hvg_selected() else "No")
     col4.metric("UMAP", "Yes" if state.umap_done() else "No")
-    # Show cell type count from whichever annotation method was run
+
     if state.annotation_done():
         n_types = adata.obs["cell_type"].nunique()
     elif state.celltypist_done():
@@ -40,5 +42,15 @@ if state.has_adata():
     else:
         n_types = None
     col4.metric("Cell types", str(n_types) if n_types is not None else "—")
+
+    if not state.qc_is_computed():
+        next_page_button("QC", "pages/02_QC.py")
+    elif not state.hvg_selected():
+        next_page_button("Preprocessing", "pages/03_Preprocessing.py")
+    elif not state.umap_done():
+        next_page_button("Dimensionality Reduction", "pages/04_Reduction.py")
+    elif not state.any_annotation_done():
+        next_page_button("Annotation", "pages/05_Annotation.py")
 else:
     st.info("No dataset loaded. Start by uploading a file on the **Upload** page.")
+    next_page_button("Upload", "pages/01_Upload.py")

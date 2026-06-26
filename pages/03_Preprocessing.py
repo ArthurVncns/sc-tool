@@ -2,8 +2,10 @@ import streamlit as st
 
 from analysis import preprocessing
 from ui import plots, state
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — Preprocessing", layout="wide")
+apply_theme()
 
 st.title("Preprocessing")
 
@@ -181,6 +183,9 @@ if workflow == "standard":
             )
             st.rerun()
 
+        if state.hvg_selected():
+            next_page_button("Dimensionality Reduction", "pages/04_Reduction.py")
+
 
 # =========================================================================
 # Workflow 2 — Pearson Residuals
@@ -228,3 +233,6 @@ elif workflow == "pearson":
             f"{int(adata.var['highly_variable'].sum()):,} HVGs selected by residual variance."
         )
         st.rerun()
+
+    if state.hvg_selected():
+        next_page_button("Dimensionality Reduction", "pages/04_Reduction.py")
