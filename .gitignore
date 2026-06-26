@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Data files — never commit raw datasets
+*.h5ad
+data/
+
+# Claude Code project instructions — personal, not part of the codebase
+CLAUDE.md
+.claude/
+
+.env
+.DS_Store
