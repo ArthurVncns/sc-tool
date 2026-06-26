@@ -169,5 +169,8 @@ def umap_scatter(adata: ad.AnnData, color_by: str | None = None) -> go.Figure:
         margin=dict(l=40, r=20, t=50, b=40),
         xaxis=dict(title="UMAP1", showgrid=False, zeroline=False),
         yaxis=dict(title="UMAP2", showgrid=False, zeroline=False),
+        # 'constant' decouples legend symbol size from the 3px scatter marker size,
+        # keeping legend dots at a readable fixed size.
+        legend=dict(itemsizing="constant"),
     )
     return fig

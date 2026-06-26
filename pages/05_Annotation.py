@@ -106,16 +106,21 @@ if not state.markers_computed():
 
 adata = state.get_adata()
 
-tab_manual, tab_celltypist, tab_scoring = st.tabs([
-    "Manual",
-    "CellTypist — automated",
-    "Marker gene scoring",
-])
+# st.radio with an explicit key persists the selection in session_state,
+# so st.rerun() never resets the chosen method back to the first option.
+method = st.radio(
+    "Annotation method",
+    options=["Manual", "CellTypist — automated", "Marker gene scoring"],
+    horizontal=True,
+    key="annotation_method",
+)
+
+st.divider()
 
 # ─────────────────────────────────────────────────────────────────
-# Tab 1: Manual annotation
+# Manual annotation
 # ─────────────────────────────────────────────────────────────────
-with tab_manual:
+if method == "Manual":
     st.write(
         "Assign a cell type name to each cluster based on the marker genes above. "
         "Leave a field blank to mark the cluster as 'Unknown'."
@@ -155,9 +160,9 @@ with tab_manual:
         )
 
 # ─────────────────────────────────────────────────────────────────
-# Tab 2: CellTypist
+# CellTypist
 # ─────────────────────────────────────────────────────────────────
-with tab_celltypist:
+elif method == "CellTypist — automated":
     st.write(
         "Automated annotation using pre-trained logistic regression models "
         "from the [CellTypist](https://www.celltypist.org/) project (Wellcome Sanger Institute). "
@@ -171,58 +176,62 @@ with tab_celltypist:
     )
 
     if state.active_workflow() == "pearson":
-        st.warning(
-            "CellTypist expects log-normalized data (Standard workflow). "
-            "You used Pearson Residuals — results may be less accurate."
+        # CellTypist is trained on log-normalized data; Pearson residuals
+        # have a different distribution and are not compatible.
+        st.error(
+            "CellTypist is not compatible with the **Pearson Residuals** workflow. "
+            "It is trained on log-normalized data (Standard workflow: CPM + log1p). "
+            "Switch to the Standard workflow to use CellTypist, "
+            "or use **Manual** or **Marker gene scoring** instead."
+        )
+    else:
+        model_label = st.selectbox(
+            "Model",
+            options=list(annotation.CELLTYPIST_MODELS.keys()),
+            help="Choose a model matching your tissue type.",
+        )
+        model_name = annotation.CELLTYPIST_MODELS[model_label]
+
+        majority_voting = st.checkbox(
+            "Majority voting",
+            value=True,
+            help=(
+                "Refines cell-level predictions using cluster-level voting. "
+                "Recommended — uses the Leiden clusters from Step 1."
+            ),
         )
 
-    model_label = st.selectbox(
-        "Model",
-        options=list(annotation.CELLTYPIST_MODELS.keys()),
-        help="Choose a model matching your tissue type.",
-    )
-    model_name = annotation.CELLTYPIST_MODELS[model_label]
+        label = "Re-run CellTypist" if state.celltypist_done() else "Run CellTypist"
+        if st.button(label, type="primary"):
+            with st.spinner(f"Running CellTypist with {model_name}..."):
+                try:
+                    adata = annotation.run_celltypist(
+                        state.get_adata(),
+                        model_name=model_name,
+                        majority_voting=majority_voting,
+                    )
+                    state.set_adata(adata)
+                    n_types = adata.obs["celltypist_cell_type"].nunique()
+                    st.session_state["_annotation_result"] = (
+                        f"CellTypist complete — {n_types} cell types predicted using {model_name}."
+                    )
+                except Exception as e:
+                    st.error(f"CellTypist failed: {e}")
+            st.rerun()
 
-    majority_voting = st.checkbox(
-        "Majority voting",
-        value=True,
-        help=(
-            "Refines cell-level predictions using cluster-level voting. "
-            "Recommended — uses the Leiden clusters from Step 1."
-        ),
-    )
-
-    label = "Re-run CellTypist" if state.celltypist_done() else "Run CellTypist"
-    if st.button(label, type="primary"):
-        with st.spinner(f"Running CellTypist with {model_name}..."):
-            try:
-                adata = annotation.run_celltypist(
-                    state.get_adata(),
-                    model_name=model_name,
-                    majority_voting=majority_voting,
-                )
-                state.set_adata(adata)
-                n_types = adata.obs["celltypist_cell_type"].nunique()
-                st.session_state["_annotation_result"] = (
-                    f"CellTypist complete — {n_types} cell types predicted using {model_name}."
-                )
-            except Exception as e:
-                st.error(f"CellTypist failed: {e}")
-        st.rerun()
-
-    if state.celltypist_done():
-        adata = state.get_adata()
-        n_types = adata.obs["celltypist_cell_type"].nunique()
-        st.success(f"{n_types} cell types predicted.")
-        st.plotly_chart(
-            plots.umap_scatter(adata, color_by="celltypist_cell_type"),
-            use_container_width=True,
-        )
+        if state.celltypist_done():
+            adata = state.get_adata()
+            n_types = adata.obs["celltypist_cell_type"].nunique()
+            st.success(f"{n_types} cell types predicted.")
+            st.plotly_chart(
+                plots.umap_scatter(adata, color_by="celltypist_cell_type"),
+                use_container_width=True,
+            )
 
 # ─────────────────────────────────────────────────────────────────
-# Tab 3: Marker gene scoring
+# Marker gene scoring
 # ─────────────────────────────────────────────────────────────────
-with tab_scoring:
+elif method == "Marker gene scoring":
     st.write(
         "Score each cell against a custom marker gene dictionary. "
         "Each cell is assigned to the cell type with the highest average marker gene expression. "
