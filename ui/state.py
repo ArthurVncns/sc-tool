@@ -116,3 +116,40 @@ def umap_done() -> bool:
     """Return True if a UMAP embedding has been computed."""
     adata = get_adata()
     return adata is not None and "X_umap" in adata.obsm
+
+
+# --- Annotation state ---
+
+def clustering_done() -> bool:
+    """Return True if Leiden clustering has been run."""
+    adata = get_adata()
+    return adata is not None and "leiden" in adata.obs.columns
+
+
+def markers_computed() -> bool:
+    """Return True if marker genes have been computed."""
+    adata = get_adata()
+    return adata is not None and "rank_genes_groups" in adata.uns
+
+
+def annotation_done() -> bool:
+    """Return True if manual cell type annotations have been applied."""
+    adata = get_adata()
+    return adata is not None and "cell_type" in adata.obs.columns
+
+
+def celltypist_done() -> bool:
+    """Return True if CellTypist annotation has been run."""
+    adata = get_adata()
+    return adata is not None and "celltypist_cell_type" in adata.obs.columns
+
+
+def marker_score_done() -> bool:
+    """Return True if marker gene scoring annotation has been run."""
+    adata = get_adata()
+    return adata is not None and "marker_score_cell_type" in adata.obs.columns
+
+
+def any_annotation_done() -> bool:
+    """Return True if any annotation method has produced results."""
+    return annotation_done() or celltypist_done() or marker_score_done()
