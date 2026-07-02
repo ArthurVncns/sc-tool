@@ -21,9 +21,18 @@ def _build_summary(adata) -> str:
     lines.append("## Quality Control")
     if "n_genes_by_counts" in adata.obs.columns:
         lines.append("- QC metrics: computed")
-    if "doublet_score" in adata.obs.columns:
-        n_d = int(adata.obs["predicted_doublet"].sum())
-        lines.append(f"- Doublet detection: {n_d:,} predicted doublets")
+    if "doublet_score" in adata.obs.columns or "sc_tool_n_doublets" in adata.uns:
+        n_d = adata.uns.get(
+            "sc_tool_n_doublets",
+            int(adata.obs.get("predicted_doublet", 0).sum()),
+        )
+        lines.append(f"- Doublet detection: {n_d:,} predicted doublets identified")
+    if "sc_tool_qc_filter" in adata.uns:
+        f = adata.uns["sc_tool_qc_filter"]
+        lines.append(
+            f"- Cell filtering: {f['n_removed']:,} cells removed "
+            f"({f['n_before']:,} → {f['n_after']:,},  ~{f['pct_removed']}%)"
+        )
     lines.append("")
 
     workflow = adata.uns.get("sc_tool_workflow")

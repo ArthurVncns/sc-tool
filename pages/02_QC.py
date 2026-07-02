@@ -235,6 +235,14 @@ st.markdown(
 # --- Apply ---
 if st.button("Apply Filters", type="primary", disabled=(n_passing == 0)):
     filtered = qc.filter_cells(adata, filters, remove_doublets=remove_doublets)
+    # Persist filtering stats so the export summary can report them
+    # even after the original unfiltered adata is no longer in memory.
+    filtered.uns["sc_tool_qc_filter"] = {
+        "n_before": adata.n_obs,
+        "n_after": filtered.n_obs,
+        "n_removed": n_removed,
+        "pct_removed": round(pct_removed, 1),
+    }
     state.set_adata(filtered)
     st.session_state["_filter_result"] = (
         f"Dataset filtered. Removed **{n_removed:,} cells** ({pct_removed:.1f}%). "

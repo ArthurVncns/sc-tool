@@ -46,4 +46,7 @@ def run_scrublet(
     adata.obs["doublet_score"] = adata_raw.obs["doublet_score"].values
     adata.obs["predicted_doublet"] = adata_raw.obs["predicted_doublet"].values
 
+    # Persist the count so it remains readable after doublets are filtered out.
+    adata.uns["sc_tool_n_doublets"] = int(adata.obs["predicted_doublet"].sum())
+
     return adata

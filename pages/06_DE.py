@@ -139,12 +139,16 @@ col1, col2 = st.columns([2, 1])
 with col1:
     method = st.radio(
         "Method",
-        options=["wilcoxon", "t-test", "logreg"],
+        options=["wilcoxon", "t-test"],
         horizontal=True,
         help=(
-            "**Wilcoxon** rank-sum test: non-parametric, robust, recommended. "
-            "**t-test**: faster but assumes normality. "
-            "**logreg**: logistic regression, good for large datasets."
+            "**Wilcoxon** (recommended): non-parametric rank-sum test. "
+            "Makes no assumptions about gene expression distributions — "
+            "robust and appropriate for most scRNA-seq datasets. "
+            "Produces p-values and fold changes for the volcano plot.\n\n"
+            "**t-test**: faster parametric test, assumes approximately normal "
+            "distributions. Can overestimate significance on zero-inflated "
+            "scRNA-seq data. Good for quick explorations on large datasets."
         ),
     )
 with col2:
