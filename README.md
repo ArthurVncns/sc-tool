@@ -2,7 +2,7 @@
 
 An interactive web application for single-cell RNA-seq analysis, built with Python and Streamlit.
 
-Upload an `.h5ad` dataset and explore it step-by-step: quality control, preprocessing, dimensionality reduction, clustering, and cell type annotation — all through a point-and-click interface, no code required.
+Upload a dataset and explore it step-by-step: quality control, doublet detection, preprocessing, batch correction, dimensionality reduction, clustering, cell type annotation, and differential expression — all through a point-and-click interface, no code required.
 
 ---
 
@@ -10,14 +10,13 @@ Upload an `.h5ad` dataset and explore it step-by-step: quality control, preproce
 
 | Step | What it does |
 |---|---|
-| **Upload** | Load any `.h5ad` file (AnnData format from Scanpy, Cell Ranger, etc.) |
-| **QC** | Per-cell metrics (genes, counts, mt / ribo / hb %) with interactive filtering sliders and live cell-count preview |
-| **Preprocessing** | Two mutually exclusive workflows: Standard (CPM + log1p) or Pearson Residuals (scTransform-like) |
-| **HVG selection** | Seurat dispersion, LOESS / Seurat v3 (raw counts), or Pearson residuals variance ranking |
-| **Dimensionality reduction** | PCA with elbow plot → UMAP with tunable neighbors and min-distance |
-| **Clustering** | Leiden algorithm with adjustable resolution; UMAP colored by cluster |
-| **Marker genes** | Wilcoxon rank-sum test per cluster; top-N marker table |
-| **Cell type annotation** | Three methods: Manual (cluster-by-cluster), CellTypist (pre-trained models), Marker gene scoring (custom JSON dictionary) |
+| **Upload** | Load `.h5ad`, 10x HDF5 (`.h5`), 10x MTX folder, or Seurat RDS files |
+| **Quality Control** | Per-cell metrics (genes, counts, mt / ribo / hb %), doublet detection (Scrublet), interactive filtering with live preview |
+| **Preprocessing** | Two workflows: Standard (CPM + log1p) or Pearson Residuals; HVG selection via Seurat, LOESS / Seurat v3, or residual variance |
+| **Dimensionality Reduction** | PCA with elbow plot, optional Harmony batch correction, UMAP with tunable neighbors and min-distance |
+| **Annotation** | Leiden clustering, Wilcoxon marker genes, cell type assignment via Manual / CellTypist / Marker gene scoring |
+| **Differential Expression** | Wilcoxon or t-test, volcano plot, filtered gene table, CSV export |
+| **Export** | Download processed `.h5ad`, cell/gene metadata CSVs, DE results, and a plain-text analysis summary |
 
 ---
 
@@ -57,7 +56,7 @@ The app opens in your browser at `http://localhost:8501`.
 pytest
 ```
 
-61 tests across IO, QC, preprocessing, dimensionality reduction, and annotation.
+86 tests across IO, QC, preprocessing, dimensionality reduction, annotation, and differential expression.
 
 ---
 
@@ -65,23 +64,28 @@ pytest
 
 ```
 sc_tool/
-├── app.py                    # Home page and entry point
+├── app.py                      # Navigation controller (st.navigation)
 ├── pages/
-│   ├── 01_Upload.py          # Dataset upload and overview
-│   ├── 02_QC.py              # Quality control and cell filtering
-│   ├── 03_Preprocessing.py   # Normalization, log transform, HVG selection
-│   ├── 04_Reduction.py       # PCA and UMAP
-│   └── 05_Annotation.py      # Clustering, marker genes, cell type annotation
-├── analysis/                 # Pure Python analysis logic (no Streamlit)
-│   ├── io.py                 # AnnData loading
-│   ├── qc.py                 # QC metrics and filtering
-│   ├── preprocessing.py      # Normalization, log transform, HVG
-│   ├── reduction.py          # PCA and UMAP
-│   └── annotation.py         # Clustering, marker genes, cell type annotation
+│   ├── home.py                 # Overview page
+│   ├── 01_Upload.py            # Dataset upload (h5ad, h5, MTX, RDS)
+│   ├── 02_QC.py                # Quality control, doublet detection, filtering
+│   ├── 03_Preprocessing.py     # Normalization, log transform, HVG selection
+│   ├── 04_Reduction.py         # PCA, Harmony, UMAP
+│   ├── 05_Annotation.py        # Clustering, marker genes, cell type annotation
+│   ├── 06_DE.py                # Differential expression
+│   └── 07_Export.py            # Data and summary export
+├── analysis/                   # Pure Python analysis logic (no Streamlit)
+│   ├── io.py                   # Multi-format data loading
+│   ├── qc.py                   # QC metrics and cell filtering
+│   ├── doublets.py             # Scrublet doublet detection
+│   ├── preprocessing.py        # Normalization, log transform, HVG
+│   ├── reduction.py            # PCA, Harmony, UMAP
+│   ├── annotation.py           # Clustering, marker genes, annotation
+│   └── de.py                   # Differential expression
 ├── ui/
-│   ├── state.py              # Centralized session_state helpers
-│   ├── plots.py              # Plotly figure builders
-│   └── theme.py              # Glass UI theme (CSS injection + navigation)
+│   ├── state.py                # Centralized session_state helpers
+│   ├── plots.py                # Plotly figure builders
+│   └── theme.py                # Glass UI theme and navigation buttons
 └── tests/
 ```
 
@@ -92,14 +96,13 @@ The `analysis/` layer is fully independent of Streamlit and can be imported into
 ## Preprocessing workflows
 
 ### Workflow 1 — Standard Scanpy
-Normalize counts per cell → log1p → select highly variable genes.
-- HVG options: Seurat (dispersion on log-normalized data) or LOESS / Seurat v3 (variance on raw counts)
+Normalize counts per cell (CPM) → log1p → select highly variable genes.
+- HVG options: Seurat (dispersion) or LOESS / Seurat v3 (variance on raw counts)
 
 ### Workflow 2 — Pearson Residuals
-Fit a regularized negative binomial model per gene → replace counts with Pearson residuals → select HVGs ranked by residual variance.
+Fit a regularized negative binomial model per gene → Pearson residuals → HVGs ranked by residual variance.
 - More robust for datasets with large differences in sequencing depth.
-- HVG selection uses raw counts via `adata.layers['counts']`.
-- CellTypist annotation is not available with this workflow (requires log-normalized data).
+- CellTypist annotation requires Workflow 1 (log-normalized data).
 
 ---
 
@@ -107,11 +110,22 @@ Fit a regularized negative binomial model per gene → replace counts with Pears
 
 | Method | How it works | Best for |
 |---|---|---|
-| **Manual** | Enter a cell type name per cluster based on marker genes | When you know your tissue well |
-| **CellTypist** | Pre-trained logistic regression models (auto-downloaded) | PBMC, lung, brain, and other common tissues |
-| **Marker gene scoring** | Score cells against a custom JSON marker dictionary | Any species or tissue without a pre-trained model |
+| **Manual** | Enter a cell type name per cluster based on marker genes | When you know your tissue |
+| **CellTypist** | Pre-trained logistic regression models, auto-downloaded | PBMC, lung, brain, and other common tissues |
+| **Marker gene scoring** | Score cells against a custom JSON marker dictionary | Any species or tissue |
 
 For PBMC data, use CellTypist with the **Immune — broad** model and majority voting enabled.
+
+---
+
+## Supported input formats
+
+| Format | How to load |
+|---|---|
+| AnnData `.h5ad` | File uploader |
+| 10x Genomics HDF5 `.h5` | File uploader |
+| 10x Genomics MTX | Local folder path (contains `matrix.mtx.gz`, `barcodes.tsv.gz`, `features.tsv.gz`) |
+| Seurat RDS | File uploader — requires R, Seurat, and `pip install rpy2` |
 
 ---
 
@@ -122,5 +136,6 @@ For PBMC data, use CellTypist with the **Immune — broad** model and majority v
 - [AnnData](https://anndata.readthedocs.io/) — data container
 - [Plotly](https://plotly.com/python/) — interactive visualizations
 - [CellTypist](https://www.celltypist.org/) — automated cell type classification
+- [harmonypy](https://github.com/slowkow/harmonypy) — batch correction
 - [scikit-misc](https://has2k1.github.io/scikit-misc/) — LOESS regression for Seurat v3 HVG
 - [igraph](https://python.igraph.org/) — Leiden clustering
