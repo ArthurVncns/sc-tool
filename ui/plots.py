@@ -5,6 +5,39 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 
+def doublet_histogram(adata: ad.AnnData) -> go.Figure:
+    """Histogram of Scrublet doublet scores, split by predicted class."""
+    scores = adata.obs["doublet_score"].values
+    is_doublet = adata.obs["predicted_doublet"].values.astype(bool)
+
+    threshold = float(scores[is_doublet].min()) if is_doublet.any() else 1.0
+
+    fig = go.Figure()
+    fig.add_trace(go.Histogram(
+        x=scores[~is_doublet], name="Singlets",
+        marker_color="steelblue", opacity=0.75, nbinsx=50,
+    ))
+    fig.add_trace(go.Histogram(
+        x=scores[is_doublet], name="Predicted doublets",
+        marker_color="coral", opacity=0.75, nbinsx=50,
+    ))
+    fig.add_vline(
+        x=threshold, line_dash="dash", line_color="red", opacity=0.6,
+        annotation_text=f"threshold = {threshold:.2f}",
+        annotation_position="top right",
+    )
+    fig.update_layout(
+        barmode="overlay",
+        title="Doublet Score Distribution",
+        xaxis_title="Doublet score",
+        yaxis_title="Number of cells",
+        height=350,
+        margin=dict(l=40, r=20, t=50, b=40),
+        legend=dict(itemsizing="constant"),
+    )
+    return fig
+
+
 def qc_violin(values: np.ndarray, title: str, yaxis_label: str) -> go.Figure:
     """Return a Plotly violin plot for a single QC metric distribution.
 

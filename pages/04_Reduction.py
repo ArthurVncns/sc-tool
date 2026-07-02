@@ -71,6 +71,55 @@ if state.pca_done():
     )
 
 # =========================================================================
+# Step 1b — Harmony batch correction (optional)
+# =========================================================================
+if state.pca_done():
+    st.divider()
+    st.subheader("Batch Correction — Harmony (optional)")
+    st.write(
+        "If your dataset contains cells from multiple samples, donors, or sequencing "
+        "runs, Harmony corrects the PCA embedding to remove technical batch effects "
+        "before building the neighborhood graph. Run **before** UMAP."
+    )
+
+    adata = state.get_adata()
+
+    if state.harmony_done():
+        batch_key_used = adata.uns.get("harmony_batch_key", "unknown")
+        st.success(f"Harmony applied — batch variable: **{batch_key_used}**.")
+        st.caption("Re-run with a different variable if needed.")
+
+    # Offer obs columns that have 2–50 unique values (plausible batch variables)
+    batch_candidates = [
+        col for col in adata.obs.columns
+        if 2 <= adata.obs[col].dropna().nunique() <= 50
+        and col not in ("predicted_doublet",)
+    ]
+
+    if batch_candidates:
+        batch_key = st.selectbox(
+            "Batch variable",
+            batch_candidates,
+            help="Column in cell metadata identifying batches, samples, or donors.",
+        )
+        label = "Re-run Harmony" if state.harmony_done() else "Run Harmony"
+        if st.button(label, type="secondary"):
+            with st.spinner(f"Running Harmony on '{batch_key}'…"):
+                adata = reduction.run_harmony(state.get_adata(), batch_key=batch_key)
+                state.set_adata(adata)
+            st.session_state["_reduction_result"] = (
+                f"Harmony complete — batch variable: '{batch_key}'. "
+                "UMAP will now use the corrected embedding."
+            )
+            st.rerun()
+    else:
+        st.info(
+            "No suitable batch variable found in cell metadata. "
+            "Harmony requires an obs column with 2–50 unique values "
+            "(e.g. sample ID, donor, condition)."
+        )
+
+# =========================================================================
 # Step 2 — UMAP
 # =========================================================================
 st.divider()
@@ -81,26 +130,38 @@ if not state.pca_done():
 else:
     adata = state.get_adata()
     n_pcs_available = adata.obsm["X_pca"].shape[1]
+    using_harmony = state.harmony_done()
+
+    if using_harmony:
+        st.info(
+            "Using **Harmony-corrected embedding** (X_pca_harmony). "
+            "The PCs slider is not applicable — Harmony uses all components."
+        )
 
     st.write(
-        "Projects cells into 2D using a neighborhood graph built on PCA coordinates. "
+        "Projects cells into 2D using a neighborhood graph. "
         "The key parameters are explained below."
     )
 
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        n_pcs = st.slider(
-            "PCs used for neighborhood graph",
-            min_value=5,
-            max_value=n_pcs_available,
-            value=min(40, n_pcs_available),
-            step=5,
-            help=(
-                "Informed by the elbow plot above — choose the PC where the curve flattens. "
-                "Using too many PCs adds noise; too few loses biological signal."
-            ),
-        )
+        if using_harmony:
+            st.markdown("**PCs for graph**")
+            st.caption("N/A — Harmony active")
+            n_pcs = n_pcs_available
+        else:
+            n_pcs = st.slider(
+                "PCs used for neighborhood graph",
+                min_value=5,
+                max_value=n_pcs_available,
+                value=min(40, n_pcs_available),
+                step=5,
+                help=(
+                    "Informed by the elbow plot above — choose the PC where the curve flattens. "
+                    "Using too many PCs adds noise; too few loses biological signal."
+                ),
+            )
 
     with col2:
         n_neighbors = st.slider(
@@ -140,9 +201,9 @@ else:
                 min_dist=min_dist,
             )
             state.set_adata(adata)
+        embedding = "Harmony-corrected" if using_harmony else f"n_pcs={n_pcs}"
         st.session_state["_reduction_result"] = (
-            f"UMAP complete (n_neighbors={n_neighbors}, "
-            f"n_pcs={n_pcs}, min_dist={min_dist})."
+            f"UMAP complete ({embedding}, n_neighbors={n_neighbors}, min_dist={min_dist})."
         )
         st.rerun()
 

@@ -155,6 +155,22 @@ def any_annotation_done() -> bool:
     return annotation_done() or celltypist_done() or marker_score_done()
 
 
+# --- Doublet detection state ---
+
+def doublet_detected() -> bool:
+    """Return True if Scrublet has been run and doublet scores are in adata.obs."""
+    adata = get_adata()
+    return adata is not None and "doublet_score" in adata.obs.columns
+
+
+# --- Harmony batch correction state ---
+
+def harmony_done() -> bool:
+    """Return True if Harmony has been applied (X_pca_harmony exists)."""
+    adata = get_adata()
+    return adata is not None and "X_pca_harmony" in adata.obsm
+
+
 # --- Differential expression state ---
 
 def de_done() -> bool:

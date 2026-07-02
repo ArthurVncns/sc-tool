@@ -1,6 +1,6 @@
 import streamlit as st
 
-from analysis import qc
+from analysis import doublets, qc
 from ui import plots, state
 from ui.theme import apply_theme, next_page_button
 
@@ -92,6 +92,38 @@ if available_metrics:
                 use_container_width=True,
             )
 
+# --- Doublet Detection (optional) ---
+st.divider()
+st.subheader("Doublet Detection (optional)")
+st.write(
+    "Scrublet simulates artificial doublets and scores each real cell by its "
+    "similarity to them. Run before filtering so you can remove doublets in one step."
+)
+
+doublet_rate = st.slider(
+    "Expected doublet rate",
+    min_value=0.01, max_value=0.20, value=0.05, step=0.01,
+    help="Typical 10x rates: ~4% for 4k cells, ~8% for 8k cells.",
+)
+
+label = "Re-run doublet detection" if state.doublet_detected() else "Detect doublets"
+if st.button(label, type="secondary"):
+    with st.spinner("Running Scrublet…"):
+        adata = doublets.run_scrublet(state.get_adata(), expected_doublet_rate=doublet_rate)
+        state.set_adata(adata)
+    n_pred = int(adata.obs["predicted_doublet"].sum())
+    st.session_state["_filter_result"] = (
+        f"Doublet detection complete — **{n_pred:,}** predicted doublets "
+        f"({n_pred / adata.n_obs * 100:.1f}% of cells)."
+    )
+    st.rerun()
+
+if state.doublet_detected():
+    adata = state.get_adata()
+    n_pred = int(adata.obs["predicted_doublet"].sum())
+    st.success(f"{n_pred:,} predicted doublets ({n_pred / adata.n_obs * 100:.1f}%).")
+    st.plotly_chart(plots.doublet_histogram(adata), use_container_width=True)
+
 # --- Filtering ---
 st.divider()
 st.subheader("Cell Filtering")
@@ -170,6 +202,16 @@ if state.mt_detected() or state.ribo_detected() or state.hb_detected():
                 help="Remove cells with hemoglobin expression (red blood cell contamination).",
             )
 
+# --- Doublet removal toggle ---
+remove_doublets = False
+if state.doublet_detected():
+    n_pred = int(adata.obs["predicted_doublet"].sum())
+    remove_doublets = st.checkbox(
+        f"Remove **{n_pred:,}** predicted doublets",
+        value=True,
+        help="Cells flagged by Scrublet will be excluded in addition to the filters above.",
+    )
+
 # --- Live preview ---
 filters = qc.QCFilters(
     min_genes=min_genes,
@@ -181,7 +223,7 @@ filters = qc.QCFilters(
     max_pct_hb=max_pct_hb,
 )
 
-n_passing = qc.count_cells_passing_filters(adata, filters)
+n_passing = qc.count_cells_passing_filters(adata, filters, remove_doublets=remove_doublets)
 n_removed = adata.n_obs - n_passing
 pct_removed = n_removed / adata.n_obs * 100
 
@@ -192,9 +234,8 @@ st.markdown(
 
 # --- Apply ---
 if st.button("Apply Filters", type="primary", disabled=(n_passing == 0)):
-    filtered = qc.filter_cells(adata, filters)
+    filtered = qc.filter_cells(adata, filters, remove_doublets=remove_doublets)
     state.set_adata(filtered)
-    # Store message before st.rerun() — it would be discarded if set via st.success() here.
     st.session_state["_filter_result"] = (
         f"Dataset filtered. Removed **{n_removed:,} cells** ({pct_removed:.1f}%). "
         f"**{filtered.n_obs:,} cells** remaining."

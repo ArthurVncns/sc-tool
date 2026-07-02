@@ -12,11 +12,13 @@ st.caption("Interactive single-cell RNA-seq analysis")
 st.markdown("""
 **Workflow**
 
-1. **Upload** — load an `.h5ad` dataset
-2. **QC** — compute quality metrics and filter low-quality cells
+1. **Upload** — load an `.h5ad`, 10x HDF5, 10x MTX, or Seurat RDS dataset
+2. **QC** — compute quality metrics, detect doublets, and filter low-quality cells
 3. **Preprocessing** — normalization and HVG selection
-4. **Dimensionality reduction** — PCA and UMAP
+4. **Dimensionality reduction** — PCA, optional Harmony batch correction, UMAP
 5. **Annotation** — cluster cells, find marker genes, assign cell types
+6. **Differential expression** — compare groups with volcano plot and gene table
+7. **Export** — download processed data and analysis summary
 
 Use the sidebar to navigate between steps.
 """)
@@ -51,6 +53,10 @@ if state.has_adata():
         next_page_button("Dimensionality Reduction", "pages/04_Reduction.py")
     elif not state.any_annotation_done():
         next_page_button("Annotation", "pages/05_Annotation.py")
+    elif not state.de_done():
+        next_page_button("Differential Expression", "pages/06_DE.py")
+    else:
+        next_page_button("Export", "pages/07_Export.py")
 else:
     st.info("No dataset loaded. Start by uploading a file on the **Upload** page.")
     next_page_button("Upload", "pages/01_Upload.py")

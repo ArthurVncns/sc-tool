@@ -74,22 +74,39 @@ def _build_filter_mask(adata: ad.AnnData, filters: QCFilters) -> pd.Series:
     return mask
 
 
-def filter_cells(adata: ad.AnnData, filters: QCFilters) -> ad.AnnData:
+def filter_cells(
+    adata: ad.AnnData,
+    filters: QCFilters,
+    remove_doublets: bool = False,
+) -> ad.AnnData:
     """Return a filtered copy of adata with low-quality cells removed.
 
     Args:
         adata: AnnData with QC metrics already in adata.obs.
         filters: Threshold values to apply.
+        remove_doublets: If True, also remove cells flagged as doublets
+            by adata.obs['predicted_doublet']. Silently ignored if
+            doublet detection has not been run.
 
     Returns:
         New AnnData containing only cells that pass all filters.
     """
-    return adata[_build_filter_mask(adata, filters)].copy()
+    mask = _build_filter_mask(adata, filters)
+    if remove_doublets and "predicted_doublet" in adata.obs.columns:
+        mask &= ~adata.obs["predicted_doublet"]
+    return adata[mask].copy()
 
 
-def count_cells_passing_filters(adata: ad.AnnData, filters: QCFilters) -> int:
+def count_cells_passing_filters(
+    adata: ad.AnnData,
+    filters: QCFilters,
+    remove_doublets: bool = False,
+) -> int:
     """Return the number of cells that would pass the given filters.
 
     Cheaper than filter_cells() when only the count is needed.
     """
-    return int(_build_filter_mask(adata, filters).sum())
+    mask = _build_filter_mask(adata, filters)
+    if remove_doublets and "predicted_doublet" in adata.obs.columns:
+        mask &= ~adata.obs["predicted_doublet"]
+    return int(mask.sum())

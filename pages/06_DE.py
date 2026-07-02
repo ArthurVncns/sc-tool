@@ -4,7 +4,7 @@ import streamlit as st
 
 from analysis import de
 from ui import plots, state
-from ui.theme import apply_theme
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — Differential Expression", layout="wide")
 apply_theme()
@@ -242,3 +242,5 @@ if state.de_done():
         file_name=f"de_{de_info['group']}_vs_{de_info['reference']}.csv",
         mime="text/csv",
     )
+
+    next_page_button("Export", "pages/07_Export.py")
