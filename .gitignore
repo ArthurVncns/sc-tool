@@ -13,6 +13,7 @@ build/
 # Data files — never commit raw datasets
 *.h5ad
 data/
+raw_gene_bc_matrices/
 
 # Claude Code project instructions — personal, not part of the codebase
 CLAUDE.md

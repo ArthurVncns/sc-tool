@@ -4,7 +4,7 @@ import streamlit as st
 
 from analysis import annotation
 from ui import plots, state
-from ui.theme import apply_theme
+from ui.theme import apply_theme, next_page_button
 
 st.set_page_config(page_title="sc_tool — Annotation", layout="wide")
 apply_theme()
@@ -278,3 +278,6 @@ elif method == "Marker gene scoring":
             plots.umap_scatter(adata, color_by="marker_score_cell_type"),
             use_container_width=True,
         )
+
+if state.clustering_done():
+    next_page_button("Differential Expression", "pages/06_DE.py")

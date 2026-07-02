@@ -153,3 +153,11 @@ def marker_score_done() -> bool:
 def any_annotation_done() -> bool:
     """Return True if any annotation method has produced results."""
     return annotation_done() or celltypist_done() or marker_score_done()
+
+
+# --- Differential expression state ---
+
+def de_done() -> bool:
+    """Return True if a differential expression analysis has been run."""
+    adata = get_adata()
+    return adata is not None and "sc_tool_de" in adata.uns

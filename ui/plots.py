@@ -174,3 +174,68 @@ def umap_scatter(adata: ad.AnnData, color_by: str | None = None) -> go.Figure:
         legend=dict(itemsizing="constant"),
     )
     return fig
+
+
+def volcano_plot(
+    df: pd.DataFrame,
+    group: str,
+    reference: str,
+    lfc_threshold: float = 0.5,
+    pval_threshold: float = 0.05,
+) -> go.Figure:
+    """Return an interactive volcano plot for differential expression results.
+
+    Args:
+        df: DataFrame from de.get_de_results() — columns include
+            names, logfoldchanges, pvals_adj.
+        group: Name of the test group (shown in legend and title).
+        reference: Name of the reference group.
+        lfc_threshold: Absolute log fold change cutoff for significance colouring.
+        pval_threshold: Adjusted p-value cutoff for significance colouring.
+    """
+    df = df.copy()
+    df["neg_log10_pval"] = -np.log10(df["pvals_adj"].clip(lower=1e-300))
+
+    up = (df["pvals_adj"] < pval_threshold) & (df["logfoldchanges"] > lfc_threshold)
+    down = (df["pvals_adj"] < pval_threshold) & (df["logfoldchanges"] < -lfc_threshold)
+
+    df["category"] = "Not significant"
+    df.loc[up, "category"] = f"Up in {group}"
+    df.loc[down, "category"] = f"Up in {reference}"
+
+    color_map = {
+        "Not significant": "lightgray",
+        f"Up in {group}": "#6D28D9",
+        f"Up in {reference}": "#F97316",
+    }
+
+    fig = px.scatter(
+        df,
+        x="logfoldchanges",
+        y="neg_log10_pval",
+        color="category",
+        hover_name="names",
+        color_discrete_map=color_map,
+        labels={
+            "logfoldchanges": "Log fold change",
+            "neg_log10_pval": "−log₁₀(adj. p-value)",
+            "category": "",
+        },
+        title=f"Differential Expression — {group} vs {reference}",
+    )
+
+    # Significance threshold lines
+    fig.add_hline(
+        y=-np.log10(pval_threshold),
+        line_dash="dash", line_color="red", opacity=0.4,
+    )
+    fig.add_vline(x=lfc_threshold, line_dash="dash", line_color="#6D28D9", opacity=0.3)
+    fig.add_vline(x=-lfc_threshold, line_dash="dash", line_color="#F97316", opacity=0.3)
+
+    fig.update_traces(marker=dict(size=4, opacity=0.7))
+    fig.update_layout(
+        height=500,
+        margin=dict(l=40, r=20, t=60, b=40),
+        legend=dict(itemsizing="constant"),
+    )
+    return fig
